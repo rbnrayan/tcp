@@ -1,14 +1,23 @@
 use std::net::TcpStream;
 use std::io;
-use tcp_utils;
+use crate::app::App;
+
+mod app;
 
 fn main() -> io::Result<()> {
     match TcpStream::connect("127.0.0.1:8080") {
-        Ok(mut stream) => {
-            let bytes_recvd = tcp_utils::read_bytes(&mut stream)?;
-            println!("Received: {}", std::string::String::from_utf8(bytes_recvd).unwrap());
+        Ok(stream) => {
+            let local_addr = stream.local_addr()?;
+            let send_logfn = |src: &[u8]| println!(
+                "[{}:{} |>>|] {{ {} bytes }} : `{}`",
+                local_addr.ip(),
+                local_addr.port(),
+                src.len(),
+                std::str::from_utf8(src).unwrap(),
+            );
 
-            tcp_utils::send_bytes(&mut stream, b"test")?;
+            let mut app = App::new(stream, send_logfn);
+            app.run()?
         },
         Err(_) => {
             println!("Couldn't conect to the server");

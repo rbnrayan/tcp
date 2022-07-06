@@ -48,3 +48,31 @@ pub fn read_bytes(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
     Ok(bytes)
 }
 
+// Log variants
+
+pub fn log_read_bytes<F>(stream: &mut TcpStream, log_fn: F) -> io::Result<Vec<u8>>
+where
+    F: Fn(&Vec<u8>)
+{
+    let recvd_bytes = read_bytes(stream)?;
+
+    if recvd_bytes.is_empty() {
+        return Err(io::Error::new(
+            io::ErrorKind::Other,
+            String::from("`tcp_utils::log_read_bytes` no bytes readed"),
+        ));
+    }
+    log_fn(&recvd_bytes);
+
+    Ok(recvd_bytes)
+}
+
+pub fn log_send_bytes<F>(stream: &mut TcpStream, src: &[u8], log_fn: F) -> io::Result<()> 
+where
+    F: Fn(&[u8])
+{
+    send_bytes(stream, src)?;
+    log_fn(src);
+
+    Ok(())
+}
