@@ -17,6 +17,7 @@ fn main() -> io::Result<()> {
             );
 
             let mut app = App::new(stream, send_logfn);
+            app.logs(true);
             app.run()?
         },
         Err(_) => {

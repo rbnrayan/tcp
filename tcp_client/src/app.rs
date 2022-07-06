@@ -7,6 +7,7 @@ where
     F: Fn(&[u8])
 {
     stream: TcpStream,
+    logs: bool,
     send_logfn: F,
 }
 
@@ -15,7 +16,16 @@ where
     F: Fn(&[u8])
 {
     pub fn new(stream: TcpStream, send_logfn: F) -> Self {
-        App { stream, send_logfn }
+        App { 
+            stream,
+            logs: false,
+            send_logfn
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn logs(&mut self, b: bool) {
+        self.logs = b;
     }
 
     pub fn run(&mut self) -> io::Result<()> {
@@ -34,14 +44,20 @@ where
             if let Some('\n') = buf.chars().next_back() {
                 buf.pop();
             }
+            if buf.is_empty() {
+                continue;
+            }
 
-            tcp_utils::log_send_bytes(
-                &mut self.stream,
-                buf.as_bytes(),
-                &self.send_logfn
-            )?;
-
-            println!();
+            if self.logs {
+                tcp_utils::log_send_bytes(
+                    &mut self.stream,
+                    buf.as_bytes(),
+                    &self.send_logfn
+                )?;
+                println!();
+            } else {
+                tcp_utils::send_bytes(&mut self.stream, buf.as_bytes())?;
+            }
         }
     }
 }
