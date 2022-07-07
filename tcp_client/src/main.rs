@@ -1,11 +1,20 @@
 use std::net::TcpStream;
 use std::io;
+use std::env;
 use crate::app::App;
 
 mod app;
 
 fn main() -> io::Result<()> {
-    match TcpStream::connect("127.0.0.1:8080") {
+    if env::args().len() < 2 {
+        println!("Usage: tcp_client <ip_address:port>");
+        return Ok(())
+    }
+
+    let args = env::args().collect::<Vec<String>>();
+    let addr = &args[1];
+
+    match TcpStream::connect(addr) {
         Ok(stream) => {
             let local_addr = stream.local_addr()?;
             let send_logfn = |src: &[u8]| println!(
