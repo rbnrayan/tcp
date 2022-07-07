@@ -16,7 +16,7 @@ fn main() -> io::Result<()> {
                 std::str::from_utf8(src).unwrap(),
             );
 
-            let mut app = App::new(stream, send_logfn);
+            let mut app = App::new(stream, Some(send_logfn));
             app.logs(true);
             app.run()?
         },

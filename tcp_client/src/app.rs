@@ -8,14 +8,14 @@ where
 {
     stream: TcpStream,
     logs: bool,
-    send_logfn: F,
+    send_logfn: Option<F>,
 }
 
 impl<F> App<F>
 where
     F: Fn(&[u8])
 {
-    pub fn new(stream: TcpStream, send_logfn: F) -> Self {
+    pub fn new(stream: TcpStream, send_logfn: Option<F>) -> Self {
         App { 
             stream,
             logs: false,
@@ -52,7 +52,7 @@ where
                 tcp_utils::log_send_bytes(
                     &mut self.stream,
                     buf.as_bytes(),
-                    &self.send_logfn
+                    self.send_logfn.as_ref().unwrap()
                 )?;
                 println!();
             } else {
