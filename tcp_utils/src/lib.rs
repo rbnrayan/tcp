@@ -1,4 +1,6 @@
 use std::net::TcpStream;
+use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
 use std::io::{self, Read, Write};
 
 pub fn send_bytes(stream: &mut TcpStream, src: &[u8]) -> io::Result<()> {
@@ -75,4 +77,43 @@ where
     log_fn(src);
 
     Ok(())
+}
+
+// Uniques IDs
+
+static COUNTER: AtomicUsize = AtomicUsize::new(0);
+pub fn get_id() -> usize { COUNTER.fetch_add(1, Ordering::Relaxed) }
+
+// Client struct
+#[derive(Debug)]
+pub struct Client {
+    id: usize,
+    username: String,
+    conn: TcpStream,
+}
+
+impl Client {
+    pub fn new(id: usize, username: String, conn: TcpStream) -> Self {
+        Client {
+            id,
+            username,
+            conn,
+        }
+    }
+
+    pub fn recv(&mut self) -> io::Result<Vec<u8>> {
+        read_bytes(&mut self.conn)
+    }
+
+    pub fn send(&mut self, bytes: &[u8]) -> io::Result<()> {
+        send_bytes(&mut self.conn, bytes)
+    }
+
+    pub fn id(&self) -> usize {
+        self.id
+    }
+
+    pub fn username(&self) -> &str {
+        &self.username
+    }
 }

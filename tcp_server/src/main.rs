@@ -1,31 +1,37 @@
 use std::net::{TcpListener, TcpStream};
 use std::io;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, RwLock};
 use threadpool::{self, ThreadPool};
-use tcp_utils;
+use tcp_utils::{self, Client};
 
 const IP: &'static str = "127.0.0.1";
 const PORT: &'static str = "8080";
 
-fn handle_connection(mut stream: TcpStream, clients: Arc<Mutex<Vec<Arc<Mutex<TcpStream>>>>>) -> io::Result<()> {
+fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Arc<RwLock<Client>>>>>) -> io::Result<()> {
     let peer_connection = stream.peer_addr()?;
-    let read_logfn = |recvd_bytes: &Vec<u8>| println!(
-        "[{}:{} |>>|] {{ {} bytes }} :\n\t`{}`",
-        peer_connection.ip(),
-        peer_connection.port(),
-        recvd_bytes.len(),
-        std::str::from_utf8(&recvd_bytes).unwrap(),
-    );
-    let send_logfn = |src: &[u8]| println!(
-        "[{}:{} |<<|] {{ {} bytes }} :\n\t`{}`",
-        peer_connection.ip(),
-        peer_connection.port(),
-        src.len(),
-        std::str::from_utf8(src).unwrap(),
-    );
+    // let read_logfn = |recvd_bytes: &Vec<u8>| println!(
+    //     "[{}:{} |>>|] {{ {} bytes }} :\n\t`{}`",
+    //     peer_connection.ip(),
+    //     peer_connection.port(),
+    //     recvd_bytes.len(),
+    //     std::str::from_utf8(&recvd_bytes).unwrap(),
+    // );
+    // let send_logfn = |src: &[u8]| println!(
+    //     "[{}:{} |<<|] {{ {} bytes }} :\n\t`{}`",
+    //     peer_connection.ip(),
+    //     peer_connection.port(),
+    //     src.len(),
+    //     std::str::from_utf8(src).unwrap(),
+    // );
 
-    let client = Arc::new(Mutex::new(stream.try_clone()?));
-    clients.lock().unwrap().push(Arc::clone(&client));
+    let client_id = tcp_utils::get_id();
+    let client_username = format!("user{}", clients.read().unwrap().len());
+    let client = Arc::new(RwLock::new(Client::new(
+        client_id,
+        client_username,
+        stream,
+    )));
+    clients.write().unwrap().push(Arc::clone(&client));
 
     println!(
         "[Connection established]\n\tIP_ADDR: {}\n\tPORT   : {}",
@@ -33,27 +39,38 @@ fn handle_connection(mut stream: TcpStream, clients: Arc<Mutex<Vec<Arc<Mutex<Tcp
         peer_connection.port()
     );
 
-    let msg = b"Connection with the server successful!";
-    tcp_utils::log_send_bytes(&mut stream, msg, send_logfn)?;
+    client.write().unwrap().send(b"Connection with the server successful!")?;
 
     loop {
-        let read_bytes = match tcp_utils::log_read_bytes(&mut stream, read_logfn) {
+        let recvd_bytes = match client.write().unwrap().recv() {
             Ok(bytes) => bytes,
             Err(_) => {
-                println!(
-                    "[Connection closed]\n\tIP_ADDR: {}\n\tPORT   : {}",
-                    peer_connection.ip(),
-                    peer_connection.port()
-                );
-                break;
+                 println!(
+                     "[Connection closed]\n\tIP_ADDR: {}\n\tPORT   : {}",
+                     peer_connection.ip(),
+                     peer_connection.port()
+                 );
+                 break;
             }
         };
-        
-        let clients_lock = clients.lock().unwrap();
-        let clients = clients_lock.iter();
-        for client in clients {
-            let mut client = client.lock().unwrap();
-            tcp_utils::log_send_bytes(&mut client, &read_bytes, send_logfn)?;
+        // let recvd_bytes = match tcp_utils::log_read_bytes(&mut stream, read_logfn) {
+        //     Ok(bytes) => bytes,
+        //     Err(_) => {
+        //         println!(
+        //             "[Connection closed]\n\tIP_ADDR: {}\n\tPORT   : {}",
+        //             peer_connection.ip(),
+        //             peer_connection.port()
+        //         );
+        //         break;
+        //     }
+        // };
+
+        let username = format!("( {} )", client.read().unwrap().username());
+        let msg = &[username.as_bytes(), &recvd_bytes].concat();
+
+        println!("[Broadcast]\n\t`{}`", std::str::from_utf8(&recvd_bytes).unwrap());
+        for client in clients.read().unwrap().iter() {
+            client.write().unwrap().send(msg)?;
         }
     }
     Ok(())
@@ -63,7 +80,7 @@ fn main() -> io::Result<()> {
     let listener = TcpListener::bind(format!("{}:{}", IP, PORT))?;
     let pool = ThreadPool::new(4, threadpool::Mode::Quiet);
 
-    let clients = Arc::new(Mutex::new(Vec::new()));
+    let clients = Arc::new(RwLock::new(Vec::new()));
 
     println!("[Server info]\n\tIP_ADDR: {}\n\tPORT   : {}\n", IP, PORT);
 

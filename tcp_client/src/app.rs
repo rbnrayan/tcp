@@ -29,8 +29,8 @@ where
     }
 
     pub fn run(&mut self) -> io::Result<()> {
-        let bytes_recvd = tcp_utils::read_bytes(&mut self.stream)?;
-        println!("[Connected]\n\t{}\n", std::string::String::from_utf8(bytes_recvd).unwrap());
+        //let bytes_recvd = tcp_utils::read_bytes(&mut self.stream)?;
+        //println!("[Connected]\n\t{}\n", std::string::String::from_utf8(bytes_recvd).unwrap());
 
         let mut buf = String::new();
         loop {
@@ -58,6 +58,9 @@ where
             } else {
                 tcp_utils::send_bytes(&mut self.stream, buf.as_bytes())?;
             }
+
+            let recvd_bytes = tcp_utils::read_bytes(&mut self.stream)?;
+            println!(" -> {}", std::string::String::from_utf8(recvd_bytes).unwrap());
         }
     }
 }
