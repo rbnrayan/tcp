@@ -1,4 +1,4 @@
-use std::net::TcpStream;
+use std::net::{TcpStream, IpAddr};
 use std::io;
 use std::env;
 use crate::app::App;
@@ -16,11 +16,10 @@ fn main() -> io::Result<()> {
 
     match TcpStream::connect(addr) {
         Ok(stream) => {
-            let local_addr = stream.local_addr()?;
-            let send_logfn = |src: &[u8]| println!(
+            let send_logfn = |src: &[u8], ip: IpAddr, port: u16| println!(
                 "[{}:{} |>>|] {{ {} bytes }} : `{}`",
-                local_addr.ip(),
-                local_addr.port(),
+                ip,
+                port,
                 src.len(),
                 std::str::from_utf8(src).unwrap(),
             );

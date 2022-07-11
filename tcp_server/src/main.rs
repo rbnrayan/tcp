@@ -1,4 +1,4 @@
-use std::net::{TcpListener, TcpStream};
+use std::net::{TcpListener, TcpStream, IpAddr};
 use std::io;
 use std::sync::{Arc, RwLock};
 use threadpool::{self, ThreadPool};
@@ -8,21 +8,20 @@ const IP: &'static str = "127.0.0.1";
 const PORT: &'static str = "8080";
 
 fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Arc<RwLock<Client>>>>>) -> io::Result<()> {
-    let peer_connection = stream.peer_addr()?;
-    // let read_logfn = |recvd_bytes: &Vec<u8>| println!(
-    //     "[{}:{} |>>|] {{ {} bytes }} :\n\t`{}`",
-    //     peer_connection.ip(),
-    //     peer_connection.port(),
-    //     recvd_bytes.len(),
-    //     std::str::from_utf8(&recvd_bytes).unwrap(),
-    // );
-    // let send_logfn = |src: &[u8]| println!(
-    //     "[{}:{} |<<|] {{ {} bytes }} :\n\t`{}`",
-    //     peer_connection.ip(),
-    //     peer_connection.port(),
-    //     src.len(),
-    //     std::str::from_utf8(src).unwrap(),
-    // );
+    let read_logfn = |recvd_bytes: &Vec<u8>, ip: IpAddr, port: u16| println!(
+        "[{}:{} |>>|] {{ {} bytes }} :\n\t`{}`",
+        ip,
+        port,
+        recvd_bytes.len(),
+        std::str::from_utf8(&recvd_bytes).unwrap(),
+    );
+    let send_logfn = |src: &[u8], ip: IpAddr, port: u16| println!(
+        "[{}:{} |<<|] {{ {} bytes }} :\n\t`{}`",
+        ip,
+        port,
+        src.len(),
+        std::str::from_utf8(src).unwrap(),
+    );
 
     let client_id = tcp_utils::get_id();
     let client_username = format!("user{}", clients.read().unwrap().len());
@@ -35,42 +34,30 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Arc<RwLock<Clien
 
     println!(
         "[Connection established]\n\tIP_ADDR: {}\n\tPORT   : {}",
-        peer_connection.ip(), 
-        peer_connection.port()
+        client.read().unwrap().conn().peer_addr()?.ip(),
+        client.read().unwrap().conn().peer_addr()?.port(),
     );
 
-    client.write().unwrap().send(b"Connection with the server successful!")?;
+    client.write().unwrap().send(b"Connection with the server successful!", send_logfn)?;
 
     loop {
-        let recvd_bytes = match client.write().unwrap().recv() {
+        let recvd_bytes = match client.write().unwrap().recv(read_logfn) {
             Ok(bytes) => bytes,
             Err(_) => {
                  println!(
                      "[Connection closed]\n\tIP_ADDR: {}\n\tPORT   : {}",
-                     peer_connection.ip(),
-                     peer_connection.port()
+                    client.read().unwrap().conn().peer_addr()?.ip(),
+                    client.read().unwrap().conn().peer_addr()?.port(),
                  );
                  break;
             }
         };
-        // let recvd_bytes = match tcp_utils::log_read_bytes(&mut stream, read_logfn) {
-        //     Ok(bytes) => bytes,
-        //     Err(_) => {
-        //         println!(
-        //             "[Connection closed]\n\tIP_ADDR: {}\n\tPORT   : {}",
-        //             peer_connection.ip(),
-        //             peer_connection.port()
-        //         );
-        //         break;
-        //     }
-        // };
 
         let username = format!("( {} )", client.read().unwrap().username());
         let msg = &[username.as_bytes(), &recvd_bytes].concat();
 
-        println!("[Broadcast]\n\t`{}`", std::str::from_utf8(&recvd_bytes).unwrap());
         for client in clients.read().unwrap().iter() {
-            client.write().unwrap().send(msg)?;
+            client.write().unwrap().send(msg, send_logfn)?;
         }
     }
     Ok(())

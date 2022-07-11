@@ -1,9 +1,11 @@
-use std::net::TcpStream;
+use std::net::{TcpStream, IpAddr};
 use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::{Arc, Mutex};
 use std::io::{self, Read, Write};
 
-pub fn send_bytes(stream: &mut TcpStream, src: &[u8]) -> io::Result<()> {
+pub fn send_bytes<F>(stream: &mut TcpStream, src: &[u8], logfn: F) -> io::Result<()> 
+where
+    F: Fn(&[u8], IpAddr, u16),
+{
     let mut data = Vec::from(src);
     data.push(b'\0');
 
@@ -19,11 +21,16 @@ pub fn send_bytes(stream: &mut TcpStream, src: &[u8]) -> io::Result<()> {
             )
         ))
     }
+    let peer_addr = stream.peer_addr()?;
+    logfn(src, peer_addr.ip(), peer_addr.port());
+
     Ok(())
 }
 
-pub fn read_bytes(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
-    // 128 bytes seems ok (for me) in this case
+pub fn read_bytes<F>(stream: &mut TcpStream, logfn: F) -> io::Result<Vec<u8>>
+where
+    F: Fn(&Vec<u8>, IpAddr, u16),
+{
     let mut buf = [0; 128];
     let mut bytes = Vec::new();
     loop {
@@ -42,41 +49,14 @@ pub fn read_bytes(stream: &mut TcpStream) -> io::Result<Vec<u8>> {
             Err(e) => return Err(
                 io::Error::new(
                     io::ErrorKind::Other,
-                    format!("`tcp_utils::send_bytes`: {}", e),
+                    format!("`tcp_utils::read_bytes`: {}", e),
                 )
             ),
         }
     }
+    let peer_addr = stream.peer_addr()?;
+    logfn(&bytes, peer_addr.ip(), peer_addr.port());
     Ok(bytes)
-}
-
-// Log variants
-
-pub fn log_read_bytes<F>(stream: &mut TcpStream, log_fn: F) -> io::Result<Vec<u8>>
-where
-    F: Fn(&Vec<u8>)
-{
-    let recvd_bytes = read_bytes(stream)?;
-
-    if recvd_bytes.is_empty() {
-        return Err(io::Error::new(
-            io::ErrorKind::Other,
-            String::from("`tcp_utils::log_read_bytes` no bytes readed"),
-        ));
-    }
-    log_fn(&recvd_bytes);
-
-    Ok(recvd_bytes)
-}
-
-pub fn log_send_bytes<F>(stream: &mut TcpStream, src: &[u8], log_fn: F) -> io::Result<()> 
-where
-    F: Fn(&[u8])
-{
-    send_bytes(stream, src)?;
-    log_fn(src);
-
-    Ok(())
 }
 
 // Uniques IDs
@@ -101,12 +81,18 @@ impl Client {
         }
     }
 
-    pub fn recv(&mut self) -> io::Result<Vec<u8>> {
-        read_bytes(&mut self.conn)
+    pub fn recv<F>(&mut self, f: F) -> io::Result<Vec<u8>>
+    where
+        F: Fn(&Vec<u8>, IpAddr, u16),
+    {
+        read_bytes(&mut self.conn, f)
     }
 
-    pub fn send(&mut self, bytes: &[u8]) -> io::Result<()> {
-        send_bytes(&mut self.conn, bytes)
+    pub fn send<F>(&mut self, bytes: &[u8], f: F) -> io::Result<()>
+    where
+        F: Fn(&[u8], IpAddr, u16),
+    {
+        send_bytes(&mut self.conn, bytes, f)
     }
 
     pub fn id(&self) -> usize {
@@ -115,5 +101,9 @@ impl Client {
 
     pub fn username(&self) -> &str {
         &self.username
+    }
+
+    pub fn conn(&self) -> &TcpStream {
+        &self.conn
     }
 }
