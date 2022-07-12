@@ -9,6 +9,10 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 static COUNTER: AtomicUsize = AtomicUsize::new(0);
 fn get_id() -> usize { COUNTER.fetch_add(1, Ordering::Relaxed) }
 
+// Client struct with:
+// a unique ID
+// a username
+// the current connection with the server
 pub struct Client {
     id: usize,
     username: String,
@@ -44,6 +48,7 @@ impl Client {
         self.conn.lock().unwrap().peer_addr().unwrap().port()
     }
 
+    // send data to the stream through the client
     pub fn send(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let nbytes = match self.conn.lock() {
             Ok(mut conn_lock) => {
@@ -59,6 +64,7 @@ impl Client {
         Ok(nbytes)
     }
 
+    // receive data to the stream through the client
     pub fn recv(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         let nbytes = match self.conn.lock() {
             Ok(mut conn_lock) => {

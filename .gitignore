@@ -1,4 +1,8 @@
-/tcp_server/target/
-/tcp_client/target/
-/tcp_utils/target/
+/.idea/
+/tcp_client/
+/tcp_server/
+/tcp_utils/
 /threadpool/target/
+/client/target/
+/client_app/target/
+/server_app/target/
