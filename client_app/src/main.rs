@@ -17,7 +17,7 @@ fn main() -> io::Result<()> {
             // set the username and send it to the server
             // then check the number of bytes sended to the server
             // assert!(sended_bytes == username.len());
-            let username = format!("username: custom_username{}", Client::gen_id());
+            let username = format!("username: _display_{}", Client::gen_id());
             let write_nbytes = stream.write(username.as_bytes())?;
             if write_nbytes != username.len() {
                 return Err(io::Error::new(io::ErrorKind::Other, format!("Expected {} bytes to be written, found {}", write_nbytes, username.len())));

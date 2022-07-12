@@ -108,7 +108,7 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Client>>>) -> io
                 if let Ok(mut stream) = stream.lock() {
                     stream.set_nonblocking(true)?;
                     if let Ok(0) = stream.read(&mut buf) {
-                        println!("[RECV] 0 bytes from Client {} ({}:{})", client_id, peer_addr.ip(), peer_addr.port());
+                        // println!("[RECV] 0 bytes from Client {} ({}:{})", client_id, peer_addr.ip(), peer_addr.port());
                         break;
                     }
                 }
@@ -116,8 +116,10 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Client>>>) -> io
                 // send data for each of the clients in the list
                 if let Ok(mut clients_lock) = clients.write() {
                     for client in clients_lock.iter_mut() {
-                        let _ = client.send(b"server test...");
-                    }         
+                        if client.username().starts_with("_display_") {
+                            let _ = client.send(b"server test...");
+                        }
+                    }
                 }
             }
 
