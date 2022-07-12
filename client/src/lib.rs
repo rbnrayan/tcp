@@ -16,15 +16,22 @@ fn get_id() -> usize { COUNTER.fetch_add(1, Ordering::Relaxed) }
 pub struct Client {
     id: usize,
     username: String,
-    conn: Arc<Mutex<TcpStream>>
+    conn: Arc<Mutex<TcpStream>>,
+    addr: (IpAddr, u16),
 }
 
 impl Client {
     pub fn new(username: String, conn: Arc<Mutex<TcpStream>>) -> Self {
+        let peer_addr = conn.lock().unwrap().peer_addr().unwrap();
+        let addr = (
+            peer_addr.ip(),
+            peer_addr.port(),
+        );
         Client {
             id: get_id(),
             username,
             conn,
+            addr,
         }
     }
 
@@ -41,11 +48,11 @@ impl Client {
     }
 
     pub fn ip(&self) -> IpAddr {
-        self.conn.lock().unwrap().peer_addr().unwrap().ip()
+        self.addr.0
     }
 
     pub fn port(&self) -> u16 {
-        self.conn.lock().unwrap().peer_addr().unwrap().port()
+        self.addr.1
     }
 
     // send data to the stream through the client
@@ -83,11 +90,6 @@ impl Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        println!("[DISCONNECTED: Client {} ({})]", self.id, self.username);
-        self.conn
-            .lock()
-            .unwrap()
-            .shutdown(std::net::Shutdown::Both)
-            .unwrap();
+        println!("[DISCONNECTED: Client {} ({}) : {}:{}]", self.id, self.username, self.addr.0, self.addr.1);
     }
 }

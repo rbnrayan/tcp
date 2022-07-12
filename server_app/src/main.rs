@@ -62,10 +62,8 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Client>>>) -> io
             // if it match the format then get the username passed
             // else get a basic username (user0, user1, ...)
             let username = if buf.starts_with(b"username: ") {
-                let username: Vec<u8> = buf.into_iter()
-                    .skip_while(|&c| c != b' ')
-                    .collect();
-                let mut username = username.into_iter();
+                let mut username = buf.into_iter()
+                    .skip_while(|&c| c != b' ');
                 username.next();
                 let username = username.collect();
                 String::from_utf8(username).unwrap()
@@ -116,14 +114,10 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Client>>>) -> io
                 }
                 // get a lock of the clients list and iter over
                 // send data for each of the clients in the list
-                // then sleep for 500ms
                 if let Ok(mut clients_lock) = clients.write() {
                     for client in clients_lock.iter_mut() {
-                        if let Err(_) = client.send(b"server test...") {
-                            println!("[FAILED TO SEND DATA TO {}:{}]", client.ip(), client.port());
-                        }
-                        std::thread::sleep(std::time::Duration::from_millis(500));
-                    }
+                        let _ = client.send(b"server test...");
+                    }         
                 }
             }
 
