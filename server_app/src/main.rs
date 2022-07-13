@@ -105,21 +105,29 @@ fn handle_connection(stream: TcpStream, clients: Arc<RwLock<Vec<Client>>>) -> io
                 // get a lock of the stream, set it to be non blocking
                 // and see if when we read it the size returned is 0
                 // if it is, the client is probably disconnected
-                if let Ok(mut stream) = stream.lock() {
+                let bytes = if let Ok(mut stream) = stream.lock() {
                     stream.set_nonblocking(true)?;
-                    if let Ok(0) = stream.read(&mut buf) {
-                        // println!("[RECV] 0 bytes from Client {} ({}:{})", client_id, peer_addr.ip(), peer_addr.port());
-                        break;
-                    }
-                }
+                    let bytes = match stream.read(&mut buf) {
+                        Ok(0) => break,
+                        Ok(nbytes) => {
+                            &buf[..nbytes]
+                        },
+                        Err(_) => { &[] },
+                    };
+                    bytes
+                } else {
+                    &[]
+                };
                 // get a lock of the clients list and iter over
                 // send data for each of the clients in the list
                 if let Ok(mut clients_lock) = clients.write() {
                     for client in clients_lock.iter_mut() {
                         if client.username().starts_with("_display_") {
-                            let _ = client.send(b"server test...");
+                            let _ = client.send(bytes);
                         }
                     }
+                } else {
+                    println!("Failed to get the lock (clients)");
                 }
             }
 
